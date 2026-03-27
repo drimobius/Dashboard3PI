@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>KTMEX IL - Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: sans-serif; margin: 0; display: flex; background: #f4f7f6; }
+        nav { width: 220px; background: #2c3e50; color: white; height: 100vh; padding: 20px; position: fixed; }
+        main { margin-left: 260px; padding: 40px; flex: 1; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h2 { color: #e30613; }
+        button { background: #e30613; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        input[type="file"] { margin: 15px 0; display: block; }
+        table { width: 100%; border-collapse: collapse; background: white; }
+        th, td { padding: 12px; border: 1px solid #eee; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <h2>KTMEX IL</h2>
+    <hr>
+    <p>ADMINISTRACIÓN</p>
+    <button onclick="location.hash='parts'" style="width:100%; margin-bottom:10px;">📦 Maestro de Partes</button>
+    <button onclick="location.hash='logs'" style="width:100%;">📊 Ver Incidencias</button>
+</nav>
+
+<main>
+    <div id="section-parts" class="card">
+        <h3>Actualizar Base de Datos de Materiales</h3>
+        <p>Selecciona el archivo Excel con las columnas: <i>ID_Cliente, Sebango, PN_Interno, QPC, Tekin_OK, Tekin_NG</i></p>
+        <input type="file" id="excel-file" accept=".xlsx, .xls">
+        <button id="btn-upload">Subir a Firebase</button>
+    </div>
+
+    <div id="section-logs" class="card">
+        <h3>Bitácora de Escaneos e Incidencias</h3>
+        <table id="table-logs">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Operador</th>
+                    <th>Status</th>
+                    <th>ID Cliente</th>
+                    <th>Detalle</th>
+                </tr>
+            </thead>
+            <tbody id="log-body"></tbody>
+        </table>
+    </div>
+</main>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, setDoc, doc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyA6Il03GHS4L_eDY1Kv3fMyF2EwuYLQ5qY",
+        authDomain: "logistica-ktmex.firebaseapp.com",
+        databaseURL: "https://logistica-ktmex-default-rtdb.firebaseio.com",
+        projectId: "logistica-ktmex",
+        storageBucket: "logistica-ktmex.firebasestorage.app",
+        messagingSenderId: "166597623735",
+        appId: "1:166597623735:web:c0f8d372bc1ee12d81b232",
+        measurementId: "G-CBPWQ5YQS4"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Lógica para procesar Excel
+    document.getElementById('btn-upload').addEventListener('click', () => {
+        const file = document.getElementById('excel-file').files[0];
+        if (!file) return alert("Selecciona un archivo");
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+
+            for (const item of json) {
+                // Usamos ID_Cliente como la llave única del documento
+                await setDoc(doc(db, "Maestro_Partes", String(item.ID_Cliente)), item);
+            }
+            alert("Base de datos actualizada correctamente en Firebase.");
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // Leer logs en tiempo real
+    const q = query(collection(db, "Bitacora_Incidencias"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+        const body = document.getElementById('log-body');
+        body.innerHTML = "";
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const date = data.timestamp?.toDate().toLocaleString() || '---';
+            body.innerHTML += `
+                <tr>
+                    <td>${date}</td>
+                    <td>${data.usuario}</td>
+                    <td style="font-weight:bold; color:${data.status === 'OK' ? 'green' : 'red'}">${data.status}</td>
+                    <td>${data.customer_id || '-'}</td>
+                    <td>${data.error_msg || 'Validación Exitosa'}</td>
+                </tr>`;
+        });
+    });
+</script>
+</body>
+</html>
