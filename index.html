@@ -2,51 +2,64 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>KTMEX IL - Dashboard</title>
+    <title>KTMEX IL - Panel de Control & KPIs</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; display: flex; background: #f4f7f6; }
-        nav { width: 220px; background: #2c3e50; color: white; height: 100vh; padding: 20px; position: fixed; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f4f7f6; }
+        nav { width: 260px; background: #1a1c2c; color: white; height: 100vh; padding: 25px; position: fixed; }
         main { margin-left: 260px; padding: 40px; flex: 1; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h2 { color: #e30613; }
-        button { background: #e30613; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        input[type="file"] { margin: 15px 0; display: block; }
-        table { width: 100%; border-collapse: collapse; background: white; }
-        th, td { padding: 12px; border: 1px solid #eee; text-align: left; }
-        th { background: #f8f9fa; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        h2 { color: #e30613; margin-top: 0; }
+        .nav-btn { background: transparent; color: #a0a0a0; border: 1px solid #2d2f45; padding: 14px; width: 100%; border-radius: 8px; text-align: left; cursor: pointer; margin-bottom: 10px; font-weight: 600; }
+        .nav-btn.active { background: #e30613; color: white; border-color: #e30613; }
+        .grid-kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        canvas { max-height: 300px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
     </style>
 </head>
 <body>
 
 <nav>
-    <h2>KTMEX IL</h2>
-    <hr>
-    <p>ADMINISTRACIÓN</p>
-    <button onclick="location.hash='parts'" style="width:100%; margin-bottom:10px;">📦 Maestro de Partes</button>
-    <button onclick="location.hash='logs'" style="width:100%;">📊 Ver Incidencias</button>
+    <h2 style="color:white;">KTMEX IL</h2>
+    <button class="nav-btn active" onclick="location.hash='dash'" id="nav-dash">📊 Dashboard KPIs</button>
+    <button class="nav-btn" onclick="location.hash='parts'" id="nav-parts">📦 Maestro Partes</button>
+    <button class="nav-btn" onclick="location.hash='gallery'" id="nav-gallery">🖼️ Biblioteca Imágenes</button>
+    <button class="nav-btn" onclick="location.hash='logs'" id="nav-logs">📋 Bitácora Completa</button>
 </nav>
 
 <main>
-    <div id="section-parts" class="card">
-        <h3>Actualizar Base de Datos de Materiales</h3>
-        <p>Selecciona el archivo Excel con las columnas: <i>ID_Cliente, Sebango, PN_Interno, QPC, Tekin_OK, Tekin_NG</i></p>
-        <input type="file" id="excel-file" accept=".xlsx, .xls">
-        <button id="btn-upload">Subir a Firebase</button>
+    <div id="section-dash" class="card">
+        <h2>Indicadores de Desempeño (KPIs)</h2>
+        <div class="grid-kpi">
+            <div class="card"><canvas id="chart-ops"></canvas></div>
+            <div class="card"><canvas id="chart-ng"></canvas></div>
+            <div class="card"><canvas id="chart-sebango"></canvas></div>
+            <div class="card">
+                <h3>Resumen General</h3>
+                <div id="kpi-stats">Cargando datos...</div>
+            </div>
+        </div>
     </div>
 
-    <div id="section-logs" class="card">
-        <h3>Bitácora de Escaneos e Incidencias</h3>
-        <table id="table-logs">
-            <thead>
-                <tr>
-                    <th>Timestamp</th>
-                    <th>Operador</th>
-                    <th>Status</th>
-                    <th>ID Cliente</th>
-                    <th>Detalle</th>
-                </tr>
-            </thead>
+    <div id="section-parts" class="card" style="display:none;">
+        <h2>Sincronizar Maestro</h2>
+        <input type="file" id="excel-parts" accept=".xlsx">
+        <button onclick="uploadMaster()" style="background:#e30613; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Subir</button>
+    </div>
+
+    <div id="section-gallery" class="card" style="display:none;">
+        <h2>Carga Masiva de Imágenes (Paso 4)</h2>
+        <input type="file" id="img-input" multiple accept="image/*">
+        <div id="status-img"></div>
+    </div>
+
+    <div id="section-logs" class="card" style="display:none;">
+        <h2>Bitácora de Operación (OK / NG)</h2>
+        <button onclick="exportLogs()" style="margin-bottom:10px;">Descargar Excel</button>
+        <table>
+            <thead><tr><th>Fecha</th><th>Usuario</th><th>ID</th><th>Status</th><th>Detalle</th></tr></thead>
             <tbody id="log-body"></tbody>
         </table>
     </div>
@@ -54,60 +67,70 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getFirestore, collection, setDoc, doc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import { getFirestore, collection, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyA6Il03GHS4L_eDY1Kv3fMyF2EwuYLQ5qY",
         authDomain: "logistica-ktmex.firebaseapp.com",
-        databaseURL: "https://logistica-ktmex-default-rtdb.firebaseio.com",
         projectId: "logistica-ktmex",
         storageBucket: "logistica-ktmex.firebasestorage.app",
         messagingSenderId: "166597623735",
-        appId: "1:166597623735:web:c0f8d372bc1ee12d81b232",
-        measurementId: "G-CBPWQ5YQS4"
+        appId: "1:166597623735:web:c0f8d372bc1ee12d81b232"
     };
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Lógica para procesar Excel
-    document.getElementById('btn-upload').addEventListener('click', () => {
-        const file = document.getElementById('excel-file').files[0];
-        if (!file) return alert("Selecciona un archivo");
+    // Navegación
+    window.onhashchange = () => {
+        const h = window.location.hash.replace('#','') || 'dash';
+        ['dash','parts','gallery','logs'].forEach(s => {
+            document.getElementById(`section-${s}`).style.display = h === s ? 'block' : 'none';
+            document.getElementById(`nav-${s}`).classList.toggle('active', h === s);
+        });
+    };
 
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-
-            for (const item of json) {
-                // Usamos ID_Cliente como la llave única del documento
-                await setDoc(doc(db, "Maestro_Partes", String(item.ID_Cliente)), item);
-            }
-            alert("Base de datos actualizada correctamente en Firebase.");
-        };
-        reader.readAsArrayBuffer(file);
-    });
-
-    // Leer logs en tiempo real
-    const q = query(collection(db, "Bitacora_Incidencias"), orderBy("timestamp", "desc"));
-    onSnapshot(q, (snapshot) => {
+    // Bitácora en tiempo real (OK y NG)
+    onSnapshot(query(collection(db, "Bitacora_Incidencias"), orderBy("timestamp", "desc")), (snap) => {
         const body = document.getElementById('log-body');
         body.innerHTML = "";
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const date = data.timestamp?.toDate().toLocaleString() || '---';
-            body.innerHTML += `
-                <tr>
-                    <td>${date}</td>
-                    <td>${data.usuario}</td>
-                    <td style="font-weight:bold; color:${data.status === 'OK' ? 'green' : 'red'}">${data.status}</td>
-                    <td>${data.customer_id || '-'}</td>
-                    <td>${data.error_msg || 'Validación Exitosa'}</td>
-                </tr>`;
+        let logs = [];
+        snap.forEach(doc => {
+            const d = doc.data();
+            logs.push(d);
+            body.innerHTML += `<tr>
+                <td>${d.timestamp?.toDate().toLocaleString() || ''}</td>
+                <td>${d.usuario}</td>
+                <td>${d.customer_id}</td>
+                <td style="color:${d.status === 'OK' ? 'green' : 'red'}"><b>${d.status}</b></td>
+                <td>${d.error_msg || '-'}</td>
+            </tr>`;
         });
+        updateCharts(logs);
     });
+
+    function updateCharts(data) {
+        const ops = {}, ngOps = {}, sebNG = {};
+        data.forEach(r => {
+            ops[r.usuario] = (ops[r.usuario] || 0) + 1;
+            if(r.status === 'NG') {
+                ngOps[r.usuario] = (ngOps[r.usuario] || 0) + 1;
+                sebNG[r.customer_id] = (sebNG[r.customer_id] || 0) + 1;
+            }
+        });
+
+        new Chart(document.getElementById('chart-ops'), {
+            type: 'bar',
+            data: { labels: Object.keys(ops), datasets: [{ label: 'Escaneos Totales', data: Object.values(ops), backgroundColor: '#1a1c2c' }] },
+            options: { plugins: { title: { display: true, text: 'Productividad por Operador' } } }
+        });
+
+        new Chart(document.getElementById('chart-ng'), {
+            type: 'pie',
+            data: { labels: Object.keys(ngOps), datasets: [{ data: Object.values(ngOps), backgroundColor: ['#e30613', '#f39c12', '#7f8c8d'] }] },
+            options: { plugins: { title: { display: true, text: 'Errores (NG) por Operador' } } }
+        });
+    }
 </script>
 </body>
 </html>
