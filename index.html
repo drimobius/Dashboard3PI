@@ -2,64 +2,86 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>KTMEX IL - Panel de Control & KPIs</title>
+    <title>KTMEX PC - Dashboard Admin V5.0</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; background: #f4f7f6; }
-        nav { width: 260px; background: #1a1c2c; color: white; height: 100vh; padding: 25px; position: fixed; }
+        nav { width: 260px; background: #1a1c2c; color: white; height: 100vh; padding: 25px; position: fixed; box-sizing: border-box; }
         main { margin-left: 260px; padding: 40px; flex: 1; }
-        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); margin-bottom: 25px; }
         h2 { color: #e30613; margin-top: 0; }
-        .nav-btn { background: transparent; color: #a0a0a0; border: 1px solid #2d2f45; padding: 14px; width: 100%; border-radius: 8px; text-align: left; cursor: pointer; margin-bottom: 10px; font-weight: 600; }
+        .nav-btn { background: transparent; color: #a0a0a0; border: 1px solid #2d2f45; padding: 14px; width: 100%; border-radius: 8px; text-align: left; cursor: pointer; margin-bottom: 10px; font-weight: 600; transition: 0.3s; }
         .nav-btn.active { background: #e30613; color: white; border-color: #e30613; }
-        .grid-kpi { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        canvas { max-height: 300px; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; }
+        .btn-main { background: #e30613; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-blue { background: #2980b9; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .btn-green { background: #27ae60; color: white; border: none; padding: 12px 25px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .drop-zone { border: 3px dashed #cbd5e0; padding: 40px; text-align: center; color: #718096; border-radius: 15px; cursor: pointer; background: #f8fafc; transition: 0.3s; }
+        .drop-zone.hover { border-color: #e30613; background: #fff5f5; color: #e30613; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        th, td { padding: 12px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
+        th { color: #718096; text-transform: uppercase; font-size: 11px; background: #fafafa; }
+        .monitor { margin-top: 15px; max-height: 300px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; padding: 10px; background: #fff; }
+        .monitor-row { display: flex; align-items: center; gap: 10px; padding: 8px; border-bottom: 1px solid #f5f5f5; }
+        .thumb { width: 40px; height: 40px; object-fit: cover; border-radius: 5px; border: 1px solid #eee; }
+        .progress-wrap { flex: 1; background: #edf2f7; border-radius: 10px; height: 8px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #e30613; width: 0%; transition: width 0.3s; }
+        .feedback { margin-top: 12px; font-size: 13px; padding: 10px; border-radius: 6px; display: none; }
+        .feedback.success { background: #e6ffed; color: #276749; display: block; }
+        .feedback.error { background: #fff5f5; color: #c53030; display: block; }
+        .feedback.loading { background: #ebf8ff; color: #2b6cb0; display: block; }
+        .st-ok { color: #27ae60; font-weight: bold; }
+        .st-ng { color: #e30613; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <nav>
-    <h2 style="color:white;">KTMEX IL</h2>
-    <button class="nav-btn active" onclick="location.hash='dash'" id="nav-dash">📊 Dashboard KPIs</button>
-    <button class="nav-btn" onclick="location.hash='parts'" id="nav-parts">📦 Maestro Partes</button>
-    <button class="nav-btn" onclick="location.hash='gallery'" id="nav-gallery">🖼️ Biblioteca Imágenes</button>
-    <button class="nav-btn" onclick="location.hash='logs'" id="nav-logs">📋 Bitácora Completa</button>
+    <h2 style="color:white; margin-bottom:30px;">KTMEX PC</h2>
+    <button class="nav-btn active" onclick="navigateTo('parts')" id="nav-parts">📦 Maestro Partes</button>
+    <button class="nav-btn" onclick="navigateTo('users')" id="nav-users">👥 Usuarios y PINs</button>
+    <button class="nav-btn" onclick="navigateTo('gallery')" id="nav-gallery">🖼️ Carga Imágenes</button>
+    <button class="nav-btn" onclick="navigateTo('logs')" id="nav-logs">📊 Bitácora Realtime</button>
 </nav>
 
 <main>
-    <div id="section-dash" class="card">
-        <h2>Indicadores de Desempeño (KPIs)</h2>
-        <div class="grid-kpi">
-            <div class="card"><canvas id="chart-ops"></canvas></div>
-            <div class="card"><canvas id="chart-ng"></canvas></div>
-            <div class="card"><canvas id="chart-sebango"></canvas></div>
-            <div class="card">
-                <h3>Resumen General</h3>
-                <div id="kpi-stats">Cargando datos...</div>
-            </div>
-        </div>
+    <div id="section-parts" class="card">
+        <h2>Sincronizar Maestro de Partes</h2>
+        <p style="color:#718096; font-size:13px;">Sube el Excel con columnas: <b>ID_Cliente</b>, Sebango, Tekin_OK, Tekin_NG.</p>
+        <input type="file" id="excel-parts" accept=".xlsx, .xls">
+        <button class="btn-main" onclick="syncParts()">ACTUALIZAR MAESTRO</button>
+        <div id="fb-parts" class="feedback"></div>
     </div>
 
-    <div id="section-parts" class="card" style="display:none;">
-        <h2>Sincronizar Maestro</h2>
-        <input type="file" id="excel-parts" accept=".xlsx">
-        <button onclick="uploadMaster()" style="background:#e30613; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer;">Subir</button>
+    <div id="section-users" class="card" style="display:none;">
+        <h2>Gestión de Usuarios</h2>
+        <input type="file" id="excel-users" accept=".xlsx, .xls">
+        <button class="btn-blue" onclick="syncUsers()">ACTUALIZAR PERSONAL</button>
+        <div id="fb-users" class="feedback"></div>
     </div>
 
     <div id="section-gallery" class="card" style="display:none;">
-        <h2>Carga Masiva de Imágenes (Paso 4)</h2>
-        <input type="file" id="img-input" multiple accept="image/*">
-        <div id="status-img"></div>
+        <h2>Biblioteca Digital (Base64)</h2>
+        <div id="lib-counter" style="margin-bottom:10px; font-weight:bold; color:#1a1c2c;">Calculando piezas con imagen...</div>
+        <div id="drop-area" class="drop-zone" onclick="document.getElementById('img-input').click()">
+            Arrastra aquí las fotos o haz clic para seleccionar<br>
+            <small>Nombre de archivo debe ser el ID Cliente (Ej: M1234.jpg)</small>
+        </div>
+        <input type="file" id="img-input" multiple accept="image/*" style="display:none;" onchange="handleImages(this.files)">
+        <div id="upload-monitor" class="monitor" style="display:none;"></div>
     </div>
 
     <div id="section-logs" class="card" style="display:none;">
-        <h2>Bitácora de Operación (OK / NG)</h2>
-        <button onclick="exportLogs()" style="margin-bottom:10px;">Descargar Excel</button>
+        <h2>Dashboard de Entregables (Tiempo Real)</h2>
+        <div style="background:#f8fafc; padding:15px; border-radius:10px; display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; margin-bottom:20px;">
+            <div><label style="font-size:12px; color:#718096;">Desde:</label><br><input type="datetime-local" id="date-start"></div>
+            <div><label style="font-size:12px; color:#718096;">Hasta:</label><br><input type="datetime-local" id="date-end"></div>
+            <button class="btn-green" onclick="exportLogs()">Descargar Reporte Excel</button>
+        </div>
+        <div id="fb-logs" class="feedback"></div>
         <table>
-            <thead><tr><th>Fecha</th><th>Usuario</th><th>ID</th><th>Status</th><th>Detalle</th></tr></thead>
+            <thead>
+                <tr><th>Fecha/Hora</th><th>Usuario</th><th>Status</th><th>ID Cliente</th><th>Mensaje</th></tr>
+            </thead>
             <tbody id="log-body"></tbody>
         </table>
     </div>
@@ -67,7 +89,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getFirestore, collection, query, orderBy, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import { getFirestore, doc, setDoc, getDoc, updateDoc, collection, query, orderBy, onSnapshot, where, getDocs, Timestamp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyA6Il03GHS4L_eDY1Kv3fMyF2EwuYLQ5qY",
@@ -81,56 +103,168 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Navegación
-    window.onhashchange = () => {
-        const h = window.location.hash.replace('#','') || 'dash';
-        ['dash','parts','gallery','logs'].forEach(s => {
-            document.getElementById(`section-${s}`).style.display = h === s ? 'block' : 'none';
-            document.getElementById(`nav-${s}`).classList.toggle('active', h === s);
+    // NAVEGACIÓN
+    window.navigateTo = (section) => {
+        ['parts', 'users', 'gallery', 'logs'].forEach(s => {
+            document.getElementById(`section-${s}`).style.display = (s === section) ? 'block' : 'none';
+            document.getElementById(`nav-${s}`).classList.toggle('active', s === section);
         });
+        if(section === 'gallery') updateLibCounter();
     };
 
-    // Bitácora en tiempo real (OK y NG)
+    // FEEDBACK
+    function setFB(id, type, msg) {
+        const el = document.getElementById(id);
+        el.className = `feedback ${type}`;
+        el.textContent = msg;
+    }
+
+    // DASHBOARD EN TIEMPO REAL (onSnapshot)
     onSnapshot(query(collection(db, "Bitacora_Incidencias"), orderBy("timestamp", "desc")), (snap) => {
-        const body = document.getElementById('log-body');
-        body.innerHTML = "";
-        let logs = [];
-        snap.forEach(doc => {
-            const d = doc.data();
-            logs.push(d);
-            body.innerHTML += `<tr>
-                <td>${d.timestamp?.toDate().toLocaleString() || ''}</td>
-                <td>${d.usuario}</td>
-                <td>${d.customer_id}</td>
-                <td style="color:${d.status === 'OK' ? 'green' : 'red'}"><b>${d.status}</b></td>
-                <td>${d.error_msg || '-'}</td>
+        const tbody = document.getElementById('log-body');
+        tbody.innerHTML = "";
+        snap.forEach(d => {
+            const l = d.data();
+            const date = l.timestamp?.toDate().toLocaleString() || "---";
+            const statusClass = l.status === "OK" ? "st-ok" : "st-ng";
+            tbody.innerHTML += `<tr>
+                <td>${date}</td>
+                <td>${l.usuario}</td>
+                <td class="${statusClass}">${l.status}</td>
+                <td>${l.customer_id}</td>
+                <td>${l.error_msg}</td>
             </tr>`;
         });
-        updateCharts(logs);
     });
 
-    function updateCharts(data) {
-        const ops = {}, ngOps = {}, sebNG = {};
-        data.forEach(r => {
-            ops[r.usuario] = (ops[r.usuario] || 0) + 1;
-            if(r.status === 'NG') {
-                ngOps[r.usuario] = (ngOps[r.usuario] || 0) + 1;
-                sebNG[r.customer_id] = (sebNG[r.customer_id] || 0) + 1;
+    // SINCRONIZAR MAESTRO DE PARTES
+    window.syncParts = async () => {
+        const file = document.getElementById('excel-parts').files[0];
+        if(!file) return setFB('fb-parts', 'error', 'Selecciona un archivo.');
+        setFB('fb-parts', 'loading', 'Sincronizando...');
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const wb = XLSX.read(e.target.result, {type:'binary'});
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            let count = 0;
+            for(let item of data) {
+                if(item.ID_Cliente) {
+                    await setDoc(doc(db, "Maestro_Partes", String(item.ID_Cliente)), item, {merge:true});
+                    count++;
+                }
             }
-        });
+            setFB('fb-parts', 'success', `${count} piezas actualizadas.`);
+        };
+        reader.readAsBinaryString(file);
+    };
 
-        new Chart(document.getElementById('chart-ops'), {
-            type: 'bar',
-            data: { labels: Object.keys(ops), datasets: [{ label: 'Escaneos Totales', data: Object.values(ops), backgroundColor: '#1a1c2c' }] },
-            options: { plugins: { title: { display: true, text: 'Productividad por Operador' } } }
-        });
+    // SINCRONIZAR USUARIOS
+    window.syncUsers = async () => {
+        const file = document.getElementById('excel-users').files[0];
+        if(!file) return setFB('fb-users', 'error', 'Selecciona un archivo.');
+        setFB('fb-users', 'loading', 'Actualizando personal...');
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const wb = XLSX.read(e.target.result, {type:'binary'});
+            const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            for(let u of data) {
+                if(u.Nomina) {
+                    await setDoc(doc(db, "Usuarios", String(u.Nomina)), {
+                        nombre: u.Nombre, pin: String(u.PIN), nivel: u.Nivel
+                    }, {merge:true});
+                }
+            }
+            setFB('fb-users', 'success', 'Usuarios actualizados.');
+        };
+        reader.readAsBinaryString(file);
+    };
 
-        new Chart(document.getElementById('chart-ng'), {
-            type: 'pie',
-            data: { labels: Object.keys(ngOps), datasets: [{ data: Object.values(ngOps), backgroundColor: ['#e30613', '#f39c12', '#7f8c8d'] }] },
-            options: { plugins: { title: { display: true, text: 'Errores (NG) por Operador' } } }
+    // CARGA DE IMÁGENES (BASE64)
+    window.handleImages = async (files) => {
+        const monitor = document.getElementById('upload-monitor');
+        monitor.style.display = 'block';
+        monitor.innerHTML = "";
+
+        for(let file of files) {
+            const id = file.name.split('.')[0].toUpperCase();
+            const row = document.createElement('div');
+            row.className = 'monitor-row';
+            row.innerHTML = `<span style="width:80px"><b>${id}</b></span><div class="progress-wrap"><div class="progress-fill" id="bar-${id}"></div></div><span id="st-${id}">Procesando...</span>`;
+            monitor.prepend(row);
+
+            try {
+                const b64 = await fileToBase64(file);
+                const docRef = doc(db, "Maestro_Partes", id);
+                const snap = await getDoc(docRef);
+                
+                if(snap.exists()) {
+                    await updateDoc(docRef, { img_url: b64 }); // Se guarda como img_url para que App B la lea directo
+                } else {
+                    await setDoc(docRef, { ID_Cliente: id, img_url: b64, Sebango: "MANUAL" });
+                }
+                
+                document.getElementById(`bar-${id}`).style.width = "100%";
+                document.getElementById(`st-${id}`).innerText = "✅ OK";
+                const img = document.createElement('img'); img.src = b64; img.className = 'thumb';
+                row.prepend(img);
+            } catch (err) {
+                document.getElementById(`st-${id}`).innerText = "❌ Error";
+            }
+        }
+        updateLibCounter();
+    };
+
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = error => reject(error);
         });
     }
+
+    async function updateLibCounter() {
+        const snap = await getDocs(collection(db, "Maestro_Partes"));
+        let count = 0;
+        snap.forEach(d => { if(d.data().img_url) count++; });
+        document.getElementById('lib-counter').innerText = `📂 ${count} de ${snap.size} piezas tienen imagen configurada.`;
+    }
+
+    // EXPORTAR LOGS CON FILTRO
+    window.exportLogs = async () => {
+        const s = document.getElementById('date-start').value;
+        const e = document.getElementById('date-end').value;
+        if(!s || !e) return setFB('fb-logs', 'error', 'Selecciona el rango de fechas.');
+        
+        setFB('fb-logs', 'loading', 'Generando reporte...');
+        const q = query(collection(db, "Bitacora_Incidencias"), 
+                  where("timestamp", ">=", Timestamp.fromDate(new Date(s))),
+                  where("timestamp", "<=", Timestamp.fromDate(new Date(e))),
+                  orderBy("timestamp", "asc"));
+        
+        const snap = await getDocs(q);
+        const rows = [];
+        snap.forEach(d => {
+            const r = d.data();
+            rows.push({
+                Fecha_Hora: r.timestamp.toDate().toLocaleString(),
+                Usuario: r.usuario,
+                Status: r.status,
+                ID_Cliente: r.customer_id,
+                Mensaje: r.error_msg
+            });
+        });
+
+        if(rows.length === 0) return setFB('fb-logs', 'error', 'No hay datos en este rango.');
+
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Bitacora");
+        XLSX.writeFile(wb, `Reporte_KTMEX_${s.split('T')[0]}.xlsx`);
+        setFB('fb-logs', 'success', 'Archivo generado.');
+    };
 </script>
 </body>
 </html>
